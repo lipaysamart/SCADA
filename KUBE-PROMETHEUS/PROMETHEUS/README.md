@@ -1,13 +1,3 @@
-## Prerequisites
-___
-#### 安装环境
-* Kube-Prometheus / main 分支
-* Kubernetes / 1.26.7
-## Getting Started
-* 安装所需依赖资源，(不建议修改里面文件)
-```
-$ kubectl create -f manifests/setup
-```
 * 修改需要魔法拉取的镜像仓库
 ```
 $ vim manifests/prometheusAdapter-deployment.yaml 
