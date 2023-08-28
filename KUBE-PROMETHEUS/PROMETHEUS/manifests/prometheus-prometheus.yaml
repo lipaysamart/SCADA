@@ -1,0 +1,68 @@
+apiVersion: monitoring.coreos.com/v1
+kind: Prometheus
+metadata:
+  labels:
+    app.kubernetes.io/component: prometheus
+    app.kubernetes.io/instance: k8s
+    app.kubernetes.io/name: prometheus
+    app.kubernetes.io/part-of: kube-prometheus
+    app.kubernetes.io/version: 2.46.0
+  name: k8s
+  namespace: monitoring
+spec:
+  alerting:
+    alertmanagers:
+    - apiVersion: v2
+      name: alertmanager-main
+      namespace: monitoring
+      port: web
+  enableFeatures: []
+  externalLabels: 
+    cluster: local
+  retention: 6h
+  enableAdminAPI: true
+  storage:
+    volumeClaimTemplates:
+    - metadata:
+        name: prom
+      spec:
+        accessModes: 
+          - ReadWriteOnce
+        storageClassName: openebs-hostpath
+        resources:
+          requests: 
+            storage: 2Gi
+  remoteWrite:
+    - url: http://vmsingle-victoria-metrics-single-server.monitoring.svc.cluster.local:8428/api/v1/write
+  image: registry.cn-guangzhou.aliyuncs.com/kubenetes-defualt/prometheus:v2.46.0
+  nodeSelector:
+    kubernetes.io/os: linux
+  podMetadata:
+    labels:
+      app.kubernetes.io/component: prometheus
+      app.kubernetes.io/instance: k8s
+      app.kubernetes.io/name: prometheus
+      app.kubernetes.io/part-of: kube-prometheus
+      app.kubernetes.io/version: 2.46.0
+  podMonitorNamespaceSelector: {}
+  podMonitorSelector: {}
+  probeNamespaceSelector: {}
+  probeSelector: {}
+  replicas: 2
+  resources:
+    requests:
+      memory: 1Gi
+      cpu: 300m
+    limits:
+      memory: 1Gi
+      cpu: 300m
+  ruleNamespaceSelector: {}
+  ruleSelector: {}
+  securityContext:
+    fsGroup: 2000
+    runAsNonRoot: true
+    runAsUser: 1000
+  serviceAccountName: prometheus-k8s
+  serviceMonitorNamespaceSelector: {}
+  serviceMonitorSelector: {}
+  version: 2.46.0
