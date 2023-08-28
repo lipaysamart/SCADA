@@ -28,7 +28,7 @@ $ vim manifests/prometheus-prometheus.yaml
   retention: 6h
 # 启用 AdminAPI
   enableAdminAPI: true
-# 持久化存储,。(由于只是 6h的数据，我们不需要分配太多空间)
+# 持久化存储。(由于只是 6h的数据，我们不需要分配太多空间)
   storage:
     volumeClaimTemplates:
     - metadata:
@@ -85,7 +85,9 @@ $ vim manifests/grafana-dashboardDatasources.yaml
 * 修改alert manager默认配置
 ```
 $ vim manifests/alertmanager-alertmanager.yaml
----  
+---
+# 副本数改为 1
+  replicas: 1
 # 数据保留时间
   retention: 9999h
 # 指定secretName
@@ -94,7 +96,7 @@ $ vim manifests/alertmanager-alertmanager.yaml
   storage:
     volumeClaimTemplate:
       spec:
-        storageClassName: openebs-hostpath
+        storageClassName: openebs-hostpath  # 填写你的 SC
         accessModes:
           - ReadWriteOnce
         resources:
@@ -134,14 +136,58 @@ stringData:
       repeat_interval: 4h
       receiver: default
       routes:
-        - receiver: defualt
+        - receiver: default
         # 正则匹配告警名称
           matchers:
-          - alertname=~"KubeA(.+)|KubeStateMetrics(.+)|KubeCPU(.+)|KubeMemory(.+)|CPUThrottling
+          - alertname =~ "KubeA(.+)|KubeStateMetrics(.+)|KubeCPU(.+)|KubeMemory(.+)|CPUThrottling"
         - receiver: workers
           matchers:
-          - alertname=~"KubeNode(.+)|Kubelet(.+)"
+          - alertname =~ "KubeNode(.+)|Kubelet(.+)"
 type: Opaque
+```
+* 修改blackbox默认配置
+```
+$ vim manifests/blackboxExporter-configuration.yaml
+---
+# 去除默认 irc、ssh 和 pop3 的检测模块, 新增 dns 模块。
+apiVersion: v1
+data:
+  config.yml: |-
+    "modules":
+      "http_2xx":
+        "http":
+          "preferred_ip_protocol": "ip4"
+          "valid_http_versions": ["HTTP/1.1", "HTTP/2"]
+          "method": "GET"
+        "prober": "http"
+        "timeout": "5s"
+      "http_post_2xx": # POST 请求
+        "http":
+          "method": "POST"
+          "preferred_ip_protocol": "ip4"
+        "prober": "http"
+      "tcp_connect": # tcp 连接
+        "prober": "tcp"
+        "timeout": "10s"
+        "tcp":
+          "preferred_ip_protocol": "ip4"
+      "dns":  # DNS 检测模块
+        "prober": "dns"
+        "dns":
+          "transport_protocol": "udp"  # 默认是 udp, tcp
+          "preferred_ip_protocol": "ip4"  # 默认是 ip6
+          query_name: "kubernetes.default.svc.cluster.local" # 利用这个域名来检查dns服务器
+      icmp:  # ping 检测服务器的存活
+        prober: icmp
+kind: ConfigMap
+metadata:
+  labels:
+    app.kubernetes.io/component: exporter
+    app.kubernetes.io/name: blackbox-exporter
+    app.kubernetes.io/part-of: kube-prometheus
+    app.kubernetes.io/version: 0.24.0
+  name: blackbox-exporter-configuration
+  namespace: monitoring
 ```
 * 添加自动发现配置
 ```

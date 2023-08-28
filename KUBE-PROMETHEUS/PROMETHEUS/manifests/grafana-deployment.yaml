@@ -1,4 +1,4 @@
-apiVersion: apps/v15
+apiVersion: apps/v1
 kind: Deployment
 metadata:
   labels:
@@ -156,7 +156,7 @@ spec:
         runAsUser: 65534
       serviceAccountName: grafana
       volumes:
-        name: grafana-storage
+      - name: grafana-storage
         persistentVolumeClaim:
           claimName: grafana-pvc
       - name: grafana-datasources
