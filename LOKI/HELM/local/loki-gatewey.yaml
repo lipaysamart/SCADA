@@ -1,0 +1,23 @@
+# local/loki-gateway.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: loki-gateway
+  labels:
+    helm.sh/chart: loki-simple-scalable-1.8.11
+    app.kubernetes.io/name: loki
+    app.kubernetes.io/instance: loki
+    app.kubernetes.io/version: "2.8.2"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: gateway
+spec:
+  type: NodePort
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+      protocol: TCP
+  selector:
+    app.kubernetes.io/name: loki
+    app.kubernetes.io/instance: loki
+    app.kubernetes.io/component: gateway

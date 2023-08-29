@@ -19,13 +19,19 @@ spec:
         resources:
           requests:
             cpu: 100m
-            memory: 100Mi
+            memory: 200Mi
+          limits:
+            cpu: 200m
+            memory: 400Mi
         ports:
         - containerPort: 6379
       # - name: redis-exporter # 它只会提供监控指标数据，主应用的metrics
       #   image: oliver006/redis_exporter:latest
       #   resources:
       #     requests:
+      #       cpu: 100m
+      #       memory: 100Mi
+      #     limits:
       #       cpu: 100m
       #       memory: 100Mi
       #   ports:

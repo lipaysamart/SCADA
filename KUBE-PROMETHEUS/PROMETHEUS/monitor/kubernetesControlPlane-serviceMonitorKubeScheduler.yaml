@@ -1,0 +1,47 @@
+# scheduler-k8s-services.yaml
+--
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: kube-system
+  name: kube-scheduler
+  labels: # 必须和下面的 ServiceMonitor 文件中的字段 matchLabels 保持一致
+    app.kubernetes.io/name: kube-scheduler
+spec:
+  selector:
+    component: kube-scheduler
+  ports:
+    - name: https-metrics
+      port: 10259
+      targetPort: 10259 # 需要注意现在版本默认的安全端口是10259
+
+# manifests/kubernetesControlPlane-serviceMonitorKubeScheduler.yaml
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  labels:
+    app.kubernetes.io/name: kube-scheduler
+    app.kubernetes.io/part-of: kube-prometheus
+  name: kube-scheduler
+  namespace: monitoring
+spec:
+  endpoints:
+  - bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
+    interval: 30s
+# 匹配 SVC 中的 ports.name
+    port: https-metrics
+# 指定协议
+    scheme: https
+# 跳过证书
+    tlsConfig:
+      insecureSkipVerify: true
+  jobLabel: app.kubernetes.io/name
+# 选择匹配哪个 Namespaces 下的 SVC
+  namespaceSelector:
+    matchNames:
+    - kube-system
+# 匹配的 SVC 标签
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: kube-scheduler

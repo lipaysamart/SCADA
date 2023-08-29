@@ -10,8 +10,8 @@ spec:
     - ReadWriteOnce # 权限
   resources: # 资源
     requests:
-      storage: 20Gi
-  storageClassName: longhorn #请求PV 资源，这里是PV的名字
+      storage: 5Gi
+  storageClassName: nfs-csi #请求PV 资源，这里是PV的名字
 
 ---
 apiVersion: apps/v1

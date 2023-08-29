@@ -35,20 +35,16 @@ configmap:
   # -- If enabled, promtail config will be created as a ConfigMap instead of a secret
   enabled: true
 
-initContainer: []
-  # # -- Specifies whether the init container for setting inotify max user instances is to be enabled
-  # - name: init
-  #   # -- Docker registry, image and tag for the init container image
-  #   image: docker.io/busybox:1.33
-  #   # -- Docker image pull policy for the init container image
-  #   imagePullPolicy: IfNotPresent
-  #   # -- The inotify max user instances to configure
-  #   command:
-  #     - sh
-  #     - -c
-  #     - sysctl -w fs.inotify.max_user_instances=128
-  #   securityContext:
-  #     privileged: true
+initContainer: 
+  - name: init
+    image: docker.io/busybox:1.33
+    imagePullPolicy: IfNotPresent
+    command:
+      - sh
+      - -c
+      - chmod -r 766  /var/log/
+    securityContext:
+      privileged: true
 
 image:
   # -- The Docker registry
@@ -93,16 +89,16 @@ readinessProbe:
   initialDelaySeconds: 10
   periodSeconds: 10
   successThreshold: 1
-  timeoutSeconds: 1
+  timeoutSeconds: 5
 
 # -- Resource requests and limits
-resources: {}
-#  limits:
-#    cpu: 200m
-#    memory: 128Mi
-#  requests:
-#    cpu: 100m
-#    memory: 128Mi
+resources: 
+  limits:
+    cpu: 200m
+    memory: 128Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
 
 # -- The security context for pods
 podSecurityContext:
