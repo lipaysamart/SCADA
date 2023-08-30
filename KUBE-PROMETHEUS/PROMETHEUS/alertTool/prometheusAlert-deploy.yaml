@@ -1,0 +1,95 @@
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: prometheus-alert-center
+    alertname: prometheus-alert-center
+  name: prometheus-alert-center
+  namespace: monitoring  
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: prometheus-alert-center
+      alertname: prometheus-alert-center
+  template:
+    metadata:
+      labels:
+        app: prometheus-alert-center
+        alertname: prometheus-alert-center
+    spec:
+      containers:
+      - image: feiyu563/prometheus-alert
+        name: prometheus-alert-center
+        env:
+        - name: TZ
+          value: "America/Los_Angeles"
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          limits:
+            cpu: 200m
+            memory: 200Mi
+          requests:
+            cpu: 100m
+            memory: 100Mi
+        volumeMounts:
+        - name: prometheus-alert-center-conf-map
+          mountPath: /app/conf/app.conf
+          subPath: app.conf
+        - name: prometheus-alert-center-conf-map
+          mountPath: /app/user.csv
+          subPath: user.csv
+        - name: app-db
+          mountPath: /app/db
+      volumes:
+      - name: prometheus-alert-center-conf-map
+        configMap:
+          name: prometheus-alert-center-conf
+          items:
+          - key: app.conf
+            path: app.conf
+          - key: user.csv
+            path: user.csv
+      - name: app-db
+        persistentVolumeClaim:
+          claimName: promealert-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    alertname: prometheus-alert-center
+  name: prometheus-alert-center
+  namespace: monitoring  
+  annotations:
+    prometheus.io/scrape: 'true'
+    prometheus.io/port: '8080'  
+spec:
+  ports:
+  - name: http
+    port: 8080
+    targetPort: http
+  selector:
+    app: prometheus-alert-center
+  type: NodePort
+---
+# apiVersion: networking.k8s.io/v1beta1
+# kind: Ingress
+# metadata:
+#   annotations:
+#     kubernetes.io/ingress.class: nginx
+#   name: prometheus-alert-center
+#   namespace: monitoring
+# spec:
+#   rules:
+#     - host: alert-center.local
+#       http:
+#         paths:
+#           - backend:
+#               serviceName: prometheus-alert-center
+#               servicePort: 8080
+#             path: /    

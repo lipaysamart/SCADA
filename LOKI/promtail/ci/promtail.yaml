@@ -35,6 +35,25 @@ data:
       sync_period: 10s
       ignore_invalid_yaml: false
 
+    limits_config:
+    # 当为true时,强制对Promtail实例执行速率限制。
+      readline_rate_enabled: true
+    # 当为true时,超过速率限制会导致该Promtail实例丢弃日志行,而不是发送到Loki。当为false时,超过速率限制会导致该Promtail实例暂时停止发送日志行,并稍后重试。
+      readline_rate_drop: false
+    # 这个Promtail实例可以推送到Loki的每秒日志行速率限制。
+      readline_rate: 10000
+    # 这个Promtail实例可以推送到Loki的并发行数的限制。
+      readline_burst: 20000
+    # 限制最大活动流的数量0表示禁用。
+      max_streams: 0
+    # 允许的最大日志行字节大小,例如, 256kb, 2M。0表示禁用。
+      max_line_size: 0
+    # 是否截断超过max_line_size的行。如果max_line_size被禁用, 则无效。
+      max_line_size_truncate: false
+
+    target_config:
+      sync_period: "10s"
+
     scrape_configs:
       - job_name: syslog
         pipeline_stages:
@@ -123,15 +142,3 @@ data:
             - __meta_kubernetes_pod_annotation_kubernetes_io_config_hash
             - __meta_kubernetes_pod_container_name
             target_label: __path__
-    limits_config:
-      readline_rate_enabled: false
-      readline_rate_drop: true
-      readline_rate: 10000
-      readline_burst: 20000
-      max_streams: 0
-      max_line_size: 0
-      max_line_size_truncate: false
-    target_config:
-      sync_period: "10s"
-    tracing:
-      enable: false
