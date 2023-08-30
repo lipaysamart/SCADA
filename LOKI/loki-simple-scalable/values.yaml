@@ -581,12 +581,12 @@ gateway:
   # -- Specifies whether the gateway should be enabled
   enabled: true
   # -- Number of replicas for the gateway
-  replicas: 3
+  replicas: 1
   # -- Enable logging of 2xx and 3xx HTTP requests
   verboseLogging: true
   autoscaling:
     # -- Enable autoscaling for the gateway
-    enabled: true
+    enabled: false
     # -- Minimum autoscaling replicas for the gateway
     minReplicas: 1
     # -- Maximum autoscaling replicas for the gateway
@@ -686,7 +686,7 @@ gateway:
     annotations: {}
     # -- Hosts configuration for the gateway ingress
     hosts:
-      - host: loki-gateway.sjfood.us
+      - host: loki-gateway.k8s.local
         paths:
           - path: /
             # -- pathType (e.g. ImplementationSpecific, Prefix, .. etc.) might also be required by some Ingress Controllers
@@ -695,7 +695,7 @@ gateway:
     tls:
       - secretName: sjfood-us-tls
         hosts:
-          - loki-gateway.sjfood.us
+          - loki-gateway.k8s.local
   # Basic auth configuration
   basicAuth:
     # -- Enables basic authentication for the gateway
@@ -729,20 +729,22 @@ gateway:
               '"$request" $body_bytes_sent "$http_referer" '
               '"$http_user_agent" "$http_x_forwarded_for"';
     # -- Allows appending custom configuration to the server block
-    serverSnippet: ""
+    serverSnippet: |-
+      client_max_body_size 100M;
     # -- Allows appending custom configuration to the http block
-    httpSnippet: ""
+    httpSnippet: |-
+      client_max_body_size 100M;
     # -- Config file contents for Nginx. Passed through the `tpl` function to allow templating
     # -- ref: https://docs.nginx.com/nginx/admin-guide/monitoring/logging/
     # @default -- See [values.yaml](values.yaml)
     file: |
-      worker_processes  1;  ## Default: 1
+      worker_processes  4;  ## Default: 1
       error_log  /dev/stderr;
       pid        /tmp/nginx.pid;
       worker_rlimit_nofile 8192;
 
       events {
-        worker_connections  4096;  ## Default: 1024
+        worker_connections  54096;  ## Default: 1024
       }
 
       http {
