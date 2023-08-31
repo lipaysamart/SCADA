@@ -1,0 +1,36 @@
+# nginx-deploy.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx
+spec:
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:1.7.9
+          ports:
+            - containerPort: 80
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx
+  labels:
+    app: nginx
+spec:
+  ports:
+    - name: nginx
+      port: 80
+      protocol: TCP
+  selector:
+    app: nginx
+  type: NodePort
+
+# while true; do curl --silent --output /dev/null --write-out '%{http_code}' http://192.168.0.106:31313; sleep 10; echo; done
