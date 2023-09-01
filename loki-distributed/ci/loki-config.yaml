@@ -129,6 +129,8 @@ stringData:
       max_query_series: 10000
       # 按时间间隔拆分查询并并行执行。值为0禁用按时间拆分。
       split_queries_by_interval: 30m
+
+    memberlist:
       join_members:
       - loki-loki-distributed-memberlist
 
@@ -155,7 +157,6 @@ stringData:
       enable_alertmanager_v2: true
       notification_timeout: 30s
       enable_api: true
-      rule_path: /loki/rules
       ring:
         kvstore:
           store: memberlist
@@ -229,7 +230,7 @@ stringData:
         kvstore:
           store: memberlist
       # 为每个租户分配多少个索引网关实例。
-      replication_factor: 1
+      # replication_factor: 1
 
     table_manager:
       retention_deletes_enabled: false
