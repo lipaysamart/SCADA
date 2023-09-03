@@ -2,7 +2,7 @@
 global:
   image:
     # -- Overrides the Docker registry globally for all images
-    registry: registry.cn-guangzhou.aliyuncs.com
+    registry: null
   # -- Overrides the priorityClassName for all pods
   priorityClassName: null
   # -- configures cluster domain ("cluster.local" by default)
@@ -29,14 +29,14 @@ loki:
       path: /ready
       port: http-metrics
     initialDelaySeconds: 30
-    timeoutSeconds: 5
+    timeoutSeconds: 3
   image:
     # -- The Docker registry
-    registry: docker.io
+    registry: registry.cn-guangzhou.aliyuncs.com
     # -- Docker image repository
-    repository: kubernetes-default/loki
+    repository: grafana/loki
     # -- Overrides the image tag whose default is the chart's appVersion
-    tag: 2.8.2
+    tag: 2.8.4
     # -- Docker image pull policy
     pullPolicy: IfNotPresent
   # -- Common annotations for all pods
@@ -166,7 +166,7 @@ loki:
   # -- Check https://grafana.com/docs/loki/latest/configuration/#common_config for more info on how to provide a common configuration
   commonConfig:
     path_prefix: /var/loki
-    replication_factor: 1
+    replication_factor: 3
 
   # -- Extra server configurations. Check https://grafana.com/docs/loki/latest/configuration/#server for more info
   extraServerConfig: {}
@@ -184,7 +184,7 @@ loki:
       secretAccessKey: null
       accessKeyId: null
       s3ForcePathStyle: false
-      insecure: false  
+      insecure: false
     gcs:
       chunkBufferSize: 0
       requestTimeout: "0s"
@@ -335,7 +335,7 @@ monitoring:
   # Dashboards for monitoring Loki
   dashboards:
     # -- If enabled, create configmap with dashboards for monitoring Loki
-    enabled: false
+    enabled: true
     # -- Alternative namespace to create dashboards ConfigMap in
     namespace: null
     # -- Additional annotations for the dashboards ConfigMap
@@ -346,9 +346,9 @@ monitoring:
   # Recording rules for monitoring Loki, required for some dashboards
   rules:
     # -- If enabled, create PrometheusRule resource with Loki recording rules
-    enabled: false
+    enabled: true
     # -- Include alerting rules
-    alerting: false
+    alerting: true
     # -- Alternative namespace to create recording rules PrometheusRule resource in
     namespace: null
     # -- Additional annotations for the rules PrometheusRule resource
@@ -392,7 +392,7 @@ monitoring:
     # -- ServiceMonitor scrape interval
     interval: null
     # -- ServiceMonitor scrape timeout in Go duration format (e.g. 15s)
-    scrapeTimeout: 15s
+    scrapeTimeout: null
     # -- ServiceMonitor relabel configs to apply to samples before scraping
     # https://github.com/prometheus-operator/prometheus-operator/blob/master/Documentation/api.md#relabelconfig
     relabelings: []
@@ -414,7 +414,7 @@ monitoring:
       # -- Controls whether to install the Grafana Agent Operator and its CRDs.
       # Note that helm will not install CRDs if this flag is enabled during an upgrade.
       # In that case install the CRDs manually from https://github.com/grafana/agent/tree/main/production/operator/crds
-      installOperator: false
+      installOperator: true
       # -- Alternative namespace for Grafana Agent resources
       namespace: null
       # -- Grafana Agent annotations
@@ -448,7 +448,7 @@ monitoring:
 # Configuration for the write
 write:
   # -- Number of replicas for the write
-  replicas: 1
+  replicas: 3
   image:
     # -- The Docker registry for the write image. Overrides `loki.image.registry`
     registry: null
@@ -475,7 +475,13 @@ write:
   # -- Volumes to add to the write pods
   extraVolumes: []
   # -- Resource requests and limits for the write
-  resources: {}
+  resources:
+    requests:
+      memory: 500Mi
+      cpu: 150m
+    limits:
+      memory: 500Mi
+      cpu: 150m
   # -- Grace period to allow the write to shutdown before it is killed. Especially for the ingestor,
   # this must be increased. It must be long enough so writes can be gracefully shutdown flushing/transferring
   # all data and to successfully leave the member ring on shutdown.
@@ -495,7 +501,7 @@ write:
   tolerations: []
   persistence:
     # -- Size of persistent disk
-    size: 5Gi
+    size: 10Gi
     # -- Storage class to be used.
     # If defined, storageClassName: <storageClass>.
     # If set to "-", storageClassName: "", which disables dynamic provisioning.
@@ -506,7 +512,7 @@ write:
 # Configuration for the read node(s)
 read:
   # -- Number of replicas for the read
-  replicas: 1
+  replicas: 3
   autoscaling:
     # -- Enable autoscaling for the read, this is only used if `queryIndex.enabled: true`
     enabled: false
@@ -517,7 +523,7 @@ read:
     # -- Target CPU utilisation percentage for the read
     targetCPUUtilizationPercentage: 60
     # -- Target memory utilisation percentage for the read
-    targetMemoryUtilizationPercentage: 80
+    targetMemoryUtilizationPercentage:
   image:
     # -- The Docker registry for the read image. Overrides `loki.image.registry`
     registry: null
@@ -544,13 +550,13 @@ read:
   # -- Volumes to add to the read pods
   extraVolumes: []
   # -- Resource requests and limits for the read
-  resources: 
+  resources:
     requests:
-      memory: 1Gi
-      cpu: 500m
+      memory: 500Mi
+      cpu: 150m
     limits:
-      memory: 1Gi
-      cpu: 500m
+      memory: 500Mi
+      cpu: 150m
   # -- Grace period to allow the read to shutdown before it is killed
   terminationGracePeriodSeconds: 30
   # -- Affinity for read pods. Passed through `tpl` and, thus, to be configured as string
@@ -568,7 +574,7 @@ read:
   tolerations: []
   persistence:
     # -- Size of persistent disk
-    size: 5Gi
+    size: 10Gi
     # -- Storage class to be used.
     # If defined, storageClassName: <storageClass>.
     # If set to "-", storageClassName: "", which disables dynamic provisioning.
@@ -586,24 +592,24 @@ gateway:
   verboseLogging: true
   autoscaling:
     # -- Enable autoscaling for the gateway
-    enabled: false
+    enabled: true
     # -- Minimum autoscaling replicas for the gateway
     minReplicas: 1
     # -- Maximum autoscaling replicas for the gateway
     maxReplicas: 3
     # -- Target CPU utilisation percentage for the gateway
-    targetCPUUtilizationPercentage: 60
+    targetCPUUtilizationPercentage: 80
     # -- Target memory utilisation percentage for the gateway
-    targetMemoryUtilizationPercentage: 80
+    targetMemoryUtilizationPercentage:
   # -- See `kubectl explain deployment.spec.strategy` for more
   # @default -- ref: https://kubernetes.io/docs/concepts/workloads/controllers/deployment/#strategy
   deploymentStrategy:
     type: RollingUpdate
   image:
     # -- The Docker registry for the gateway image
-    registry: registry.cn-guangzhou.aliyuncs.com
+    registry: docker.io
     # -- The gateway image repository
-    repository: kubernetes-default/nginx-unprivileged
+    repository: nginxinc/nginx-unprivileged
     # -- The gateway image tag
     tag: 1.19-alpine
     # -- The gateway image pull policy
@@ -638,13 +644,7 @@ gateway:
         - ALL
     allowPrivilegeEscalation: false
   # -- Resource requests and limits for the gateway
-  resources: 
-    requests:
-      memory: 256Mi
-      cpu: 128m
-    limits:
-      memory: 256Mi
-      cpu: 128m
+  resources: {}
   # -- Grace period to allow the gateway to shutdown before it is killed
   terminationGracePeriodSeconds: 30
   # -- Affinity for gateway pods. Passed through `tpl` and, thus, to be configured as string
@@ -686,16 +686,16 @@ gateway:
     annotations: {}
     # -- Hosts configuration for the gateway ingress
     hosts:
-      - host: loki-gateway.k8s.local
+      - host: gateway.loki.example.com
         paths:
           - path: /
             # -- pathType (e.g. ImplementationSpecific, Prefix, .. etc.) might also be required by some Ingress Controllers
-            pathType: Prefix
+            # pathType: Prefix
     # -- TLS configuration for the gateway ingress
     tls:
-      - secretName: sjfood-us-tls
+      - secretName: loki-gateway-tls
         hosts:
-          - loki-gateway.k8s.local
+          - gateway.loki.example.com
   # Basic auth configuration
   basicAuth:
     # -- Enables basic authentication for the gateway
@@ -720,7 +720,7 @@ gateway:
       path: /
       port: http
     initialDelaySeconds: 15
-    timeoutSeconds: 5
+    timeoutSeconds: 1
   nginxConfig:
     # -- NGINX log format
     # @default -- ref: https://docs.nginx.com/nginx/admin-guide/monitoring/logging/
@@ -738,7 +738,7 @@ gateway:
     # -- ref: https://docs.nginx.com/nginx/admin-guide/monitoring/logging/
     # @default -- See [values.yaml](values.yaml)
     file: |
-      worker_processes  4;  ## Default: 1
+      worker_processes  5;  ## Default: 1
       error_log  /dev/stderr;
       pid        /tmp/nginx.pid;
       worker_rlimit_nofile 8192;
@@ -926,4 +926,3 @@ minio:
     requests:
       cpu: 100m
       memory: 128Mi
-

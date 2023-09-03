@@ -1,16 +1,3 @@
-apiVersion: v1
-kind: Secret
-metadata:
-  name: loki-config
-  namespace: monitoring
-  labels:
-    helm.sh/chart: loki-distributed-0.71.2
-    app.kubernetes.io/name: loki-distributed
-    app.kubernetes.io/instance: loki
-    app.kubernetes.io/version: "2.8.4"
-    app.kubernetes.io/managed-by: Helm
-stringData:
-  config.yaml: |
     auth_enabled: true
 
     server:
@@ -21,6 +8,10 @@ stringData:
       grpc_server_max_concurrent_streams: 0
       log_format: json
       log_level: info
+
+    # 通用配置
+    common:
+      compactor_address: http://loki-loki-distributed-compactor:3100
 
     compactor:
       # 下载文件进行压缩的工作目录。
@@ -40,6 +31,19 @@ stringData:
       compactor_ring:
         kvstore:
           store: memberlist
+      shared_store_key_prefix: compactor_index/
+
+    distributor:
+      ring:
+        kvstore:
+          store: memberlist
+      rate_store:
+        # 向ingester流API发出的并发请求的最大数量
+        max_request_parallelism: 2000
+        # 分发器从ingester更新当前流速的间隔
+        stream_rate_update_interval: 5s
+        # 更新速率时，分发器与任何给定的ingester之间的通信超时
+        ingester_request_timeout: 3s
 
     frontend:
       # 每个前端租户的最大未完成请求数；超过此数会返回 HTTP 429 错误。
@@ -48,6 +52,12 @@ stringData:
       compress_responses: true
       # 查询持续时间超过指定时间的查询将被记录日志。设置为 0 以禁用该功能。
       log_queries_longer_than: 5s
+      # 用于尾部代理的查询器的 URL
+      tail_proxy_url: http://loki-loki-distributed-querier:3100
+    frontend_worker:
+      frontend_address: loki-loki-distributed-query-frontend-headless:9095
+      # 每个查询前端或查询调度器同时处理的查询数。
+      parallelism: 100
 
     ingester:
       # 块的目标“压缩”大小（以字节为单位）。这是一个期望的大小，而不是精确的大小。
@@ -65,7 +75,7 @@ stringData:
           kvstore:
             store: memberlist
           # 写入和读取的ingesters数量。
-          replication_factor: 1
+          replication_factor: 3
       max_transfer_retries: 0
       wal:
         # 在重放期间WAL可以使用的最大内存大小。达到此限制后，它将在继续之前将数据刷新到存储中。可以应用单位后缀（KB、MB、GB）。
@@ -108,7 +118,7 @@ stringData:
 
     memberlist:
       join_members:
-      - loki-memberlist
+      - loki-loki-distributed-memberlist
 
     query_range:
       align_queries_with_step: true
@@ -121,7 +131,8 @@ stringData:
             expiration: 1h
 
     ruler:
-      alertmanager_url: http://alertmanager-main.monitoring.svc:9093
+      alertmanager_url: http://alertmanager-main:9093
+      external_url: http://172.16.10.101:30090
       storage:
         local:
           directory: /etc/loki/rules
@@ -147,6 +158,9 @@ stringData:
         schema: v12
         store: boltdb-shipper
 
+    runtime_config:
+      file: /var/loki-distributed-runtime/runtime.yaml
+
     # 配置如何缓存块以及在将它们保存到后端存储之前等待多长时间
     chunk_store_config:
       chunk_cache_config:
@@ -163,7 +177,7 @@ stringData:
       aws:
         endpoint: minio-service:9000
         insecure: true
-        bucketnames: local
+        bucketnames: tenant
         access_key_id: minio
         secret_access_key: minio123
         s3forcepathstyle: true
@@ -176,6 +190,8 @@ stringData:
         cache_ttl: 12h
         shared_store: s3
         cache_location: /var/loki/cache
+        index_gateway_client:
+          server_address: dns:///loki-loki-distributed-index-gateway:9095        
       filesystem:
         directory: /var/loki/chunks
       # 每批获取的最大块数。
@@ -193,4 +209,18 @@ stringData:
         at: 0 
         max_per_second: 20  
         up_to: 3
-type: Opaque
+
+    #定义索引网关服务器将以哪种模式运行（默认为“simple”）。它支持两种模式：
+    # - 'simple'：一个索引网关服务器实例负责处理、存储和返回所有租户的所有索引的请求。
+    # - 'ring'：一个索引网关服务器实例负责一部分租户，而不是所有租户。    
+    index_gateway:
+      mode: simple
+      ring:
+        kvstore:
+          store: memberlist
+      # 为每个租户分配多少个索引网关实例。
+      # replication_factor: 1
+
+    table_manager:
+      retention_deletes_enabled: false
+      retention_period: 0s

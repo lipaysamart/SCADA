@@ -1,19 +1,3 @@
-
----
-apiVersion: v1
-kind: PersistentVolumeClaim #创建PVC
-metadata:
-  name: minio
-  namespace: monitoring
-spec:
-  accessModes:
-    - ReadWriteOnce # 权限
-  resources: # 资源
-    requests:
-      storage: 5Gi
-  storageClassName: nfs-csi #请求PV 资源，这里是PV的名字
-
----
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -48,7 +32,7 @@ spec:
         # Volume 'data' is mounted to path '/data'
         - name: data 
           mountPath: /data
-        # Pulls the latest Minio image from Docker Hub
+        # 这个镜像版本需要内核 4.x 
         image: registry.cn-guangzhou.aliyuncs.com/kubernetes-default/minio:RELEASE.2023-03-24T21-41-23Z
         command:
           - /bin/bash
@@ -82,23 +66,3 @@ spec:
             port: 9000
           initialDelaySeconds: 120
           periodSeconds: 20
-
----
-kind: Service
-apiVersion: v1
-metadata:
-  name: minio-service
-  namespace: monitoring
-  labels:
-    app: minio-service
-spec:
-  ports:
-    - name: http-9000
-      protocol: TCP
-      port: 9000
-    - name: http-9001
-      protocol: TCP
-      port: 9001
-  selector:
-    app: minio
-  type: NodePort

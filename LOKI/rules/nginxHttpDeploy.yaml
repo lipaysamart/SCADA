@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
         - name: nginx
-          image: nginx:1.7.9
+          image: nginx:latest
           ports:
             - containerPort: 80
 ---
@@ -32,5 +32,3 @@ spec:
   selector:
     app: nginx
   type: NodePort
-
-# while true; do curl --silent --output /dev/null --write-out '%{http_code}' http://192.168.0.106:31313; sleep 10; echo; done

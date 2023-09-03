@@ -1,0 +1,13 @@
+---
+apiVersion: v1
+kind: PersistentVolumeClaim #创建PVC
+metadata:
+  name: minio
+  namespace: monitoring
+spec:
+  accessModes:
+    - ReadWriteOnce # 权限
+  resources: # 资源
+    requests:
+      storage: 5Gi
+  storageClassName: nfs-csi #请求PV 资源，这里是PV的名字

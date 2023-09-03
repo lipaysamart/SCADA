@@ -4,9 +4,46 @@ nameOverride: null
 # -- Overrides the chart's computed fullname
 fullnameOverride: null
 
+global:
+  # -- Allow parent charts to override registry hostname
+  imageRegistry: ""
+  # -- Allow parent charts to override registry credentials
+  imagePullSecrets: []
+
 daemonset:
   # -- Deploys Promtail as a DaemonSet
   enabled: true
+  autoscaling:
+    # -- Creates a VerticalPodAutoscaler for the daemonset
+    enabled: false
+
+    # Recommender responsible for generating recommendation for the object.
+    # List should be empty (then the default recommender will generate the recommendation)
+    # or contain exactly one recommender.
+    # recommenders:
+    # - name: custom-recommender-performance
+
+    # -- List of resources that the vertical pod autoscaler can control. Defaults to cpu and memory
+    controlledResources: []
+
+    # Specifies which resource values should be controlled: RequestsOnly or RequestsAndLimits.
+    # controlledValues: RequestsAndLimits
+
+    # -- Defines the max allowed resources for the pod
+    maxAllowed: {}
+    # cpu: 200m
+    # memory: 100Mi
+    # -- Defines the min allowed resources for the pod
+    minAllowed: {}
+    # cpu: 200m
+    # memory: 100Mi
+
+    # updatePolicy:
+      # Specifies minimal number of replicas which need to be alive for VPA Updater to attempt pod eviction
+      # minReplicas: 1
+      # Specifies whether recommended updates are applied when a Pod is started and whether recommended updates
+      # are applied during the life of a Pod. Possible values are "Off", "Initial", "Recreate", and "Auto".
+      # updateMode: Auto
 
 deployment:
   # -- Deploys Promtail as a Deployment
@@ -35,32 +72,48 @@ configmap:
   # -- If enabled, promtail config will be created as a ConfigMap instead of a secret
   enabled: true
 
-# initContainer: 
-#   - name: init
-#     image: docker.io/busybox:1.33
-#     imagePullPolicy: IfNotPresent
-#     command:
-#       - sh
-#       - -c
-#       - chmod -R 766  /var/log/
-#     securityContext:
-#       privileged: true
+initContainer: []
+  # # -- Specifies whether the init container for setting inotify max user instances is to be enabled
+  # - name: init
+  #   # -- Docker registry, image and tag for the init container image
+  #   image: docker.io/busybox:1.33
+  #   # -- Docker image pull policy for the init container image
+  #   imagePullPolicy: IfNotPresent
+  #   # -- The inotify max user instances to configure
+  #   command:
+  #     - sh
+  #     - -c
+  #     - sysctl -w fs.inotify.max_user_instances=128
+  #   securityContext:
+  #     privileged: true
 
 image:
   # -- The Docker registry
-  registry: registry.cn-guangzhou.aliyuncs.com
+  registry: docker.io
   # -- Docker image repository
-  repository: kubernetes-default/promtail
+  repository: grafana/promtail
   # -- Overrides the image tag whose default is the chart's appVersion
-  tag: 2.8.2
+  tag: null
   # -- Docker image pull policy
   pullPolicy: IfNotPresent
 
 # -- Image pull secrets for Docker images
 imagePullSecrets: []
 
+# -- hostAliases to add
+hostAliases: []
+#  - ip: 1.2.3.4
+#    hostnames:
+#      - domain.tld
+
+# -- Controls whether the pod has the `hostNetwork` flag set.
+hostNetwork: null
+
 # -- Annotations for the DaemonSet
 annotations: {}
+
+# -- Number of old history to retain to allow rollback (If not set, default Kubernetes value is set to 10)
+# revisionHistoryLimit: 1
 
 # -- The update strategy for the DaemonSet
 updateStrategy: {}
@@ -89,10 +142,10 @@ readinessProbe:
   initialDelaySeconds: 10
   periodSeconds: 10
   successThreshold: 1
-  timeoutSeconds: 5
+  timeoutSeconds: 1
 
 # -- Resource requests and limits
-resources: 
+resources:
   limits:
     cpu: 200m
     memory: 128Mi
@@ -185,7 +238,6 @@ extraVolumeMounts:
   - name: syslog
     mountPath: /var/log/messages
     readOnly: true
-
 # Extra args for the Promtail container.
 extraArgs: []
 # -- Example:
@@ -207,7 +259,7 @@ enableServiceLinks: true
 # ServiceMonitor configuration
 serviceMonitor:
   # -- If enabled, ServiceMonitor resources for Prometheus Operator are created
-  enabled: true
+  enabled: false
   # -- Alternative namespace for ServiceMonitor resources
   namespace: null
   # -- Namespace selector for ServiceMonitor resources
@@ -229,7 +281,7 @@ serviceMonitor:
   # https://github.com/prometheus-operator/prometheus-operator/blob/master/Documentation/api.md#relabelconfig
   # (defines `metric_relabel_configs`)
   metricRelabelings: []
-  # --ServiceMonitor will add labels from the service to the Prometheus metric
+  # -- ServiceMonitor will add labels from the service to the Prometheus metric
   # https://github.com/prometheus-operator/prometheus-operator/blob/main/Documentation/api.md#servicemonitorspec
   targetLabels: []
   # -- ServiceMonitor will use http by default, but you can pick https as well
@@ -238,34 +290,34 @@ serviceMonitor:
   tlsConfig: null
   # -- Prometheus rules will be deployed for alerting purposes
   prometheusRule:
-    enabled: true
+    enabled: false
     additionalLabels: {}
     # namespace:
-    rules:
-      - alert: PromtailRequestErrors
-        expr: 100 * sum(rate(promtail_request_duration_seconds_count{status_code=~"5..|failed"}[1m])) by (namespace, job, route, instance) / sum(rate(promtail_request_duration_seconds_count[1m])) by (namespace, job, route, instance) > 10
-        for: 5m
-        labels:
-          severity: critical
-        annotations:
-          description: |
-            The {{ $labels.job }} {{ $labels.route }} is experiencing
-            {{ printf \"%.2f\" $value }} errors.
-            VALUE = {{ $value }}
-            LABELS = {{ $labels }}
-          summary: Promtail request errors (instance {{ $labels.instance }})
-      - alert: PromtailRequestLatency
-        expr: histogram_quantile(0.99, sum(rate(promtail_request_duration_seconds_bucket[5m])) by (le)) > 1
-        for: 5m
-        labels:
-          severity: critical
-        annotations:
-          summary: Promtail request latency (instance {{ $labels.instance }})
-          description: |
-            The {{ $labels.job }} {{ $labels.route }} is experiencing
-            {{ printf \"%.2f\" $value }}s 99th percentile latency.
-            VALUE = {{ $value }}
-            LABELS = {{ $labels }}
+    rules: []
+    #  - alert: PromtailRequestErrors
+    #    expr: 100 * sum(rate(promtail_request_duration_seconds_count{status_code=~"5..|failed"}[1m])) by (namespace, job, route, instance) / sum(rate(promtail_request_duration_seconds_count[1m])) by (namespace, job, route, instance) > 10
+    #    for: 5m
+    #    labels:
+    #      severity: critical
+    #    annotations:
+    #      description: |
+    #        The {{ $labels.job }} {{ $labels.route }} is experiencing
+    #        {{ printf \"%.2f\" $value }} errors.
+    #        VALUE = {{ $value }}
+    #        LABELS = {{ $labels }}
+    #      summary: Promtail request errors (instance {{ $labels.instance }})
+    #  - alert: PromtailRequestLatency
+    #    expr: histogram_quantile(0.99, sum(rate(promtail_request_duration_seconds_bucket[5m])) by (le)) > 1
+    #    for: 5m
+    #    labels:
+    #      severity: critical
+    #    annotations:
+    #      summary: Promtail request latency (instance {{ $labels.instance }})
+    #      description: |
+    #        The {{ $labels.job }} {{ $labels.route }} is experiencing
+    #        {{ printf \"%.2f\" $value }}s 99th percentile latency.
+    #        VALUE = {{ $value }}
+    #        LABELS = {{ $labels }}
 
 # Extra containers created as part of a Promtail Deployment resource
 # - spec for Container:
@@ -342,6 +394,10 @@ podSecurityPolicy:
 # which is a templated string that references the other values and snippets below this key.
 # @default -- See `values.yaml`
 config:
+  # -- Enable Promtail config from Helm chart
+  # Set `configmap.enabled: true` and this to `false` to manage your own Promtail config
+  # See default config in `values.yaml`
+  enabled: true
   # -- The log level of the Promtail server
   # Must be reference in `config.file` to configure `server.log_level`
   # See default config in `values.yaml`
@@ -350,7 +406,7 @@ config:
   # Must be reference in `config.file` to configure `server.log_format`
   # Valid formats: `logfmt, json`
   # See default config in `values.yaml`
-  logFormat: json
+  logFormat: logfmt
   # -- The port of the Promtail server
   # Must be reference in `config.file` to configure `server.http_listen_port`
   # See default config in `values.yaml`
@@ -484,20 +540,33 @@ config:
       log_level: info
       log_format: json
       http_listen_port: 3101
-      http_server_idle_timeout: 120s
-      http_server_write_timeout: 30s
-      http_server_read_timeout: 30s
       graceful_shutdown_timeout: 30s
-      profiling_enabled: false
 
     clients:
-      - url: http://loki-gateway/loki/api/v1/push
-        batchwait: 1s
-        batchsize: 1048576
+      # Loki监听的URL，以http_listen_address和http_listen_port在Loki中表示。
+      # 如果Loki以微服务模式运行，则这是Distributor的HTTP URL。需要包含推送API的路径。
+      - url: http://loki-loki-distributed-gateway/loki/api/v1/push
+        # 默认用于将日志推送到Loki的租户ID。
+        # tenant_id: tenant
+        # 在发送批处理之前等待的最长时间，即使该批处理未满。
+        batchwait: 3s
+        # 在将批处理发送到Loki之前累积的日志的最大批处理大小（以字节为单位）
+        batchsize: 4048576
+        # 禁用对Loki以429状态码（TooManyRequests）响应的批处理的重试。
+        # 这减少了来自其他租户的批处理的影响，这些批处理可能由于指数回退而被延迟或丢弃。
         drop_rate_limited_batches: true
+        # 添加到发送到Loki的所有日志的静态标签。
         external_labels:
           cluster: local
+        # 等待服务器响应请求的最长时间。
         timeout: 30s
+        backoff_config:
+          # 重试之间的初始退避时间
+          min_period: 500ms
+          # 重试之间的最大退避时间
+          max_period: 5m
+          # 配置在请求失败时重试向Loki发送请求次数。
+          max_retries: 10
 
     positions:
       filename: /run/promtail/positions.yaml
@@ -505,17 +574,26 @@ config:
       ignore_invalid_yaml: false
 
     limits_config:
-      readline_rate_enabled: false
-      readline_rate_drop: true
+    # 当为true时,强制对Promtail实例执行速率限制。
+      readline_rate_enabled: true
+    # 当为true时,超过速率限制会导致该Promtail实例丢弃日志行,而不是发送到Loki。当为false时,超过速率限制会导致该Promtail实例暂时停止发送日志行,并稍后重试。
+      readline_rate_drop: false
+    # 这个Promtail实例可以推送到Loki的每秒日志行速率限制。
       readline_rate: 10000
+    # 这个Promtail实例可以推送到Loki的并发行数的限制。
       readline_burst: 20000
+    # 限制最大活动流的数量0表示禁用。
       max_streams: 0
+    # 允许的最大日志行字节大小,例如, 256kb, 2M。0表示禁用。
       max_line_size: 0
+    # 是否截断超过max_line_size的行。如果max_line_size被禁用, 则无效。
       max_line_size_truncate: false
 
     target_config:
+      # 同步目录和文件的周期，用于发现新的目录或停止监视已删除的目录。
       sync_period: "10s"
 
+    # 配置Promtail如何使用指定的发现方法从一系列目标中抓取日志
     scrape_configs:
       - job_name: syslog
         pipeline_stages:
@@ -657,13 +735,13 @@ sidecar:
     # -- Liveness probe for sidecar config-reloader
     livenessProbe: {}
     # -- Resource requests and limits for sidecar config-reloader
-    resources: {}
-    #  limits:
-    #    cpu: 200m
-    #    memory: 128Mi
-    #  requests:
-    #    cpu: 100m
-    #    memory: 128Mi
+    resources: 
+      limits:
+        cpu: 2m
+        memory: 58Mi
+      requests:
+        cpu: 2m
+        memory: 58Mi
     config:
       # -- The port of the config-reloader server
       serverPort: 9533
@@ -681,4 +759,3 @@ extraObjects: []
   #     data:
   #       - key: promtail-oauth2-creds
   #         name: client_secret
-

@@ -38,7 +38,7 @@ loki:
       path: /ready
       port: http
     initialDelaySeconds: 30
-    timeoutSeconds: 3
+    timeoutSeconds: 1
   livenessProbe:
     httpGet:
       path: /ready
@@ -50,7 +50,7 @@ loki:
     # -- Docker image repository
     repository: kubernetes-default/loki
     # -- Overrides the image tag whose default is the chart's appVersion
-    tag: 2.8.4
+    tag: null
     # -- Docker image pull policy
     pullPolicy: IfNotPresent
   # -- Common labels for all pods
@@ -75,7 +75,7 @@ loki:
         - ALL
     allowPrivilegeEscalation: false
   # -- Specify an existing secret containing loki configuration. If non-empty, overrides `loki.config`
-  existingSecretForConfig: ""
+  existingSecretForConfig: loki-config
   # -- Adds the appProtocol field to the memberlist service. This allows memberlist to work with istio protocol selection. Ex: "http" or "tcp"
   appProtocol: ""
   # -- Common annotations for all loki services
@@ -110,8 +110,8 @@ loki:
         ring:
           kvstore:
             store: memberlist
-          replication_factor: 1
-      chunk_idle_period: 30m
+          replication_factor: 2
+      chunk_idle_period: 1h
       chunk_block_size: 262144
       chunk_encoding: snappy
       chunk_retain_period: 1m
@@ -242,7 +242,31 @@ loki:
 #   boltdb: {}
 
   # -- Structured loki configuration, takes precedence over `loki.config`, `loki.schemaConfig`, `loki.storageConfig`
-  structuredConfig: {}
+  structuredConfig:
+    ingester:
+      max_transfer_retries: 0
+      chunk_idle_period: 1h
+      chunk_target_size: 1536000
+      max_chunk_age: 1h
+    storage_config:
+      aws:
+        endpoint: minio-service:9000
+        insecure: true
+        bucketnames: tenant-1
+        access_key_id: minio
+        secret_access_key: minio123
+        s3forcepathstyle: true
+      boltdb_shipper:
+        shared_store: s3
+    schema_config:
+      configs:
+        - from: 2022-06-21
+          store: boltdb-shipper
+          object_store: s3
+          schema: v12
+          index:
+            prefix: loki_index_
+            period: 24h
 
 # -- Provides a reloadable runtime configuration file for some specific configuration
 runtimeConfig: {}
@@ -367,9 +391,9 @@ prometheusRule:
 # Configuration for the ingester
 ingester:
   # -- Kind of deployment [StatefulSet/Deployment]
-  kind: StatefulSet
+  kind: Deployment
   # -- Number of replicas for the ingester
-  replicas: 1
+  replicas: 2
   # -- hostAliases to add
   hostAliases: []
   #  - ip: 1.2.3.4
@@ -379,11 +403,11 @@ ingester:
     # -- Enable autoscaling for the ingester
     enabled: true
     # -- Minimum autoscaling replicas for the ingester
-    minReplicas: 1
+    minReplicas: 2
     # -- Maximum autoscaling replicas for the ingester
     maxReplicas: 3
     # -- Target CPU utilisation percentage for the ingester
-    targetCPUUtilizationPercentage: 60
+    targetCPUUtilizationPercentage: 
     # -- Target memory utilisation percentage for the ingester
     targetMemoryUtilizationPercentage: 80
     behavior:
@@ -421,13 +445,13 @@ ingester:
   # -- Volumes to add to the ingester pods
   extraVolumes: []
   # -- Resource requests and limits for the ingester
-  resources: 
+  resources:
     requests:
-      memory: 500Mi
-      cpu: 200m
+      memory: 200Mi
+      cpu: 100m
     limits:
-      memory: 500Mi
-      cpu: 200m
+      memory: 200Mi
+      cpu: 100m
   # -- Containers to add to the ingester pods
   extraContainers: []
   # -- Init containers to add to the ingester pods
@@ -464,7 +488,7 @@ ingester:
                 {{- include "loki.ingesterSelectorLabels" . | nindent 12 }}
             topologyKey: failure-domain.beta.kubernetes.io/zone
   # -- Pod Disruption Budget maxUnavailable
-  maxUnavailable: null
+  maxUnavailable: 1
   # -- Max Surge for ingester pods
   maxSurge: 0
   # -- Node selector for ingester pods
@@ -490,7 +514,7 @@ ingester:
         #   If set to "-", storageClassName: "", which disables dynamic provisioning.
         #   If empty or set to null, no storageClassName spec is
         #   set, choosing the default provisioner (gp2 on AWS, standard on GKE, AWS, and OpenStack).
-        storageClass: nfs-client
+        storageClass: nfs-csi
       # - name: wal
       #   size: 150Gi
 
@@ -502,7 +526,7 @@ ingester:
 # Configuration for the distributor
 distributor:
   # -- Number of replicas for the distributor
-  replicas: 1
+  replicas: 2
   # -- hostAliases to add
   hostAliases: []
   #  - ip: 1.2.3.4
@@ -512,13 +536,13 @@ distributor:
     # -- Enable autoscaling for the distributor
     enabled: true
     # -- Minimum autoscaling replicas for the distributor
-    minReplicas: 1
+    minReplicas: 2
     # -- Maximum autoscaling replicas for the distributor
     maxReplicas: 3
     # -- Target CPU utilisation percentage for the distributor
-    targetCPUUtilizationPercentage: 60
+    targetCPUUtilizationPercentage: 
     # -- Target memory utilisation percentage for the distributor
-    targetMemoryUtilizationPercentage:
+    targetMemoryUtilizationPercentage: 80
     behavior:
       # -- Enable autoscaling behaviours
       enabled: false
@@ -554,13 +578,13 @@ distributor:
   # -- Volumes to add to the distributor pods
   extraVolumes: []
   # -- Resource requests and limits for the distributor
-  resources: 
+  resources:
     requests:
-      memory: 500Mi
-      cpu: 200m
+      memory: 200Mi
+      cpu: 100m
     limits:
-      memory: 500Mi
-      cpu: 200m
+      memory: 200Mi
+      cpu: 100m
   # -- Containers to add to the distributor pods
   extraContainers: []
   # -- Grace period to allow the distributor to shutdown before it is killed
@@ -582,7 +606,7 @@ distributor:
                 {{- include "loki.distributorSelectorLabels" . | nindent 12 }}
             topologyKey: failure-domain.beta.kubernetes.io/zone
   # -- Pod Disruption Budget maxUnavailable
-  maxUnavailable: null
+  maxUnavailable: 1
   # -- Max Surge for distributor pods
   maxSurge: 0
   # -- Node selector for distributor pods
@@ -597,7 +621,7 @@ distributor:
 # Configuration for the querier
 querier:
   # -- Number of replicas for the querier
-  replicas: 1
+  replicas: 2
   # -- hostAliases to add
   hostAliases: []
   #  - ip: 1.2.3.4
@@ -607,11 +631,11 @@ querier:
     # -- Enable autoscaling for the querier, this is only used if `indexGateway.enabled: true`
     enabled: true
     # -- Minimum autoscaling replicas for the querier
-    minReplicas: 1
+    minReplicas: 2
     # -- Maximum autoscaling replicas for the querier
     maxReplicas: 3
     # -- Target CPU utilisation percentage for the querier
-    targetCPUUtilizationPercentage: 60
+    targetCPUUtilizationPercentage: 
     # -- Target memory utilisation percentage for the querier
     targetMemoryUtilizationPercentage: 80
     behavior:
@@ -649,13 +673,13 @@ querier:
   # -- Volumes to add to the querier pods
   extraVolumes: []
   # -- Resource requests and limits for the querier
-  resources: 
+  resources:
     requests:
-      memory: 500Mi
-      cpu: 200m
+      memory: 200Mi
+      cpu: 100m
     limits:
-      memory: 500Mi
-      cpu: 200m
+      memory: 200Mi
+      cpu: 100m
   # -- Containers to add to the querier pods
   extraContainers: []
   # -- Init containers to add to the querier pods
@@ -688,7 +712,7 @@ querier:
                 {{- include "loki.querierSelectorLabels" . | nindent 12 }}
             topologyKey: failure-domain.beta.kubernetes.io/zone
   # -- Pod Disruption Budget maxUnavailable
-  maxUnavailable: null
+  maxUnavailable: 1
   # -- Max Surge for querier pods
   maxSurge: 0
   # -- Node selector for querier pods
@@ -707,7 +731,7 @@ querier:
     # If set to "-", storageClassName: "", which disables dynamic provisioning.
     # If empty or set to null, no storageClassName spec is
     # set, choosing the default provisioner (gp2 on AWS, standard on GKE, AWS, and OpenStack).
-    storageClass: nfs-client
+    storageClass: nfs-csi
     # -- Annotations for querier PVCs
     annotations: {}
   # -- Adds the appProtocol field to the querier service. This allows querier to work with istio protocol selection.
@@ -718,7 +742,7 @@ querier:
 # Configuration for the query-frontend
 queryFrontend:
   # -- Number of replicas for the query-frontend
-  replicas: 1
+  replicas: 2
   # -- hostAliases to add
   hostAliases: []
   #  - ip: 1.2.3.4
@@ -728,13 +752,13 @@ queryFrontend:
     # -- Enable autoscaling for the query-frontend
     enabled: true
     # -- Minimum autoscaling replicas for the query-frontend
-    minReplicas: 1
+    minReplicas: 2
     # -- Maximum autoscaling replicas for the query-frontend
     maxReplicas: 3
     # -- Target CPU utilisation percentage for the query-frontend
-    targetCPUUtilizationPercentage: 60
+    targetCPUUtilizationPercentage: 
     # -- Target memory utilisation percentage for the query-frontend
-    targetMemoryUtilizationPercentage:
+    targetMemoryUtilizationPercentage: 80
     behavior:
       # -- Enable autoscaling behaviours
       enabled: false
@@ -770,12 +794,12 @@ queryFrontend:
   # -- Volumes to add to the query-frontend pods
   extraVolumes: []
   # -- Resource requests and limits for the query-frontend
-  resources: 
+  resources:
     requests:
-      memory: 300Mi
+      memory: 200Mi
       cpu: 100m
     limits:
-      memory: 300Mi
+      memory: 200Mi
       cpu: 100m
   # -- Containers to add to the query-frontend pods
   extraContainers: []
@@ -798,7 +822,7 @@ queryFrontend:
                 {{- include "loki.queryFrontendSelectorLabels" . | nindent 12 }}
             topologyKey: failure-domain.beta.kubernetes.io/zone
   # -- Pod Disruption Budget maxUnavailable
-  maxUnavailable: null
+  maxUnavailable: 1
   # -- Node selector for query-frontend pods
   nodeSelector: {}
   # -- Tolerations for query-frontend pods
@@ -847,7 +871,13 @@ queryScheduler:
   # -- Volumes to add to the query-scheduler pods
   extraVolumes: []
   # -- Resource requests and limits for the query-scheduler
-  resources: {}
+  resources:
+    requests:
+      memory: 200Mi
+      cpu: 100m
+    limits:
+      memory: 200Mi
+      cpu: 100m
   # -- Containers to add to the query-scheduler pods
   extraContainers: []
   # -- Grace period to allow the query-scheduler to shutdown before it is killed
@@ -986,13 +1016,13 @@ gateway:
   verboseLogging: true
   autoscaling:
     # -- Enable autoscaling for the gateway
-    enabled: false
+    enabled: true
     # -- Minimum autoscaling replicas for the gateway
     minReplicas: 1
     # -- Maximum autoscaling replicas for the gateway
     maxReplicas: 3
     # -- Target CPU utilisation percentage for the gateway
-    targetCPUUtilizationPercentage: 60
+    targetCPUUtilizationPercentage: 80
     # -- Target memory utilisation percentage for the gateway
     targetMemoryUtilizationPercentage:
     behavior:
@@ -1045,7 +1075,13 @@ gateway:
         - ALL
     allowPrivilegeEscalation: false
   # -- Resource requests and limits for the gateway
-  resources: {}
+  resources:
+    requests:
+      memory: 100Mi
+      cpu: 200m
+    limits:
+      memory: 100Mi
+      cpu: 200m
   # -- Containers to add to the gateway pods
   extraContainers: []
   # -- Grace period to allow the gateway to shutdown before it is killed
@@ -1154,10 +1190,10 @@ gateway:
               '"$request" $body_bytes_sent "$http_referer" '
               '"$http_user_agent" "$http_x_forwarded_for"';
     # -- Allows appending custom configuration to the server block
-    serverSnippet: 
+    serverSnippet: |-
       client_max_body_size 100M;
     # -- Allows appending custom configuration to the http block
-    httpSnippet: 
+    httpSnippet: |-
       client_max_body_size 100M;
     # -- Allows overriding the DNS resolver address nginx will use.
     resolver: ""
@@ -1170,7 +1206,7 @@ gateway:
       worker_rlimit_nofile 8192;
 
       events {
-        worker_connections  54096;  ## Default: 1024
+        worker_connections  4096;  ## Default: 1024
       }
 
       http {
@@ -1335,7 +1371,13 @@ compactor:
   # -- Volumes to add to the compactor pods
   extraVolumes: []
   # -- Resource requests and limits for the compactor
-  resources: {}
+  resources:
+    requests:
+      memory: 100Mi
+      cpu: 50m
+    limits:
+      memory: 100Mi
+      cpu: 50m
   # -- Containers to add to the compactor pods
   extraContainers: []
   # -- Init containers to add to the compactor pods
@@ -1359,7 +1401,7 @@ compactor:
     # If set to "-", storageClassName: "", which disables dynamic provisioning.
     # If empty or set to null, no storageClassName spec is
     # set, choosing the default provisioner (gp2 on AWS, standard on GKE, AWS, and OpenStack).
-    storageClass: nfs-client
+    storageClass: nfs-csi
     # -- Annotations for compactor PVCs
     annotations: {}
   serviceAccount:
@@ -1416,7 +1458,13 @@ ruler:
   # -- Volumes to add to the ruler pods
   extraVolumes: []
   # -- Resource requests and limits for the ruler
-  resources: {}
+  resources:
+    requests:
+      memory: 100Mi
+      cpu: 50m
+    limits:
+      memory: 100Mi
+      cpu: 50m
   # -- Containers to add to the ruler pods
   extraContainers: []
   # -- Init containers to add to the ruler pods
@@ -1451,49 +1499,33 @@ ruler:
     # -- Enable creating PVCs which is required when using recording rules
     enabled: true
     # -- Size of persistent disk
-    size: 10Gi
+    size: 5Gi
     # -- Storage class to be used.
     # If defined, storageClassName: <storageClass>.
     # If set to "-", storageClassName: "", which disables dynamic provisioning.
     # If empty or set to null, no storageClassName spec is
     # set, choosing the default provisioner (gp2 on AWS, standard on GKE, AWS, and OpenStack).
-    storageClass: nfs-client
+    storageClass: nfs-csi
     # -- Annotations for ruler PVCs
     annotations: {}
   # -- Directories containing rules files
   directories: 
-      tenant_local:
-        rules0.txt: |
-          groups:
-            - name: nginx-rate
-              rules:
-              - alert: LokiNginxRate
-                expr: sum(rate({app="nginx"} |= "error" [1m])) by (job)
-                      /
-                    sum(rate({app="nginx"}[1m])) by (job)
-                      > 0.01
-                for: 1m
-                labels:
-                  severity: critical
-                annotations:
-                  summary: loki nginx rate
-                  description: high request latency        
-    # tenant_foo:
-    #   rules1.txt: |
-    #     groups:
-    #       - name: should_fire
-    #         rules:
-    #           - alert: HighPercentageError
-    #             expr: |
-    #               sum(rate({app="foo", env="production"} |= "error" [5m])) by (job)
-    #                 /
-    #               sum(rate({app="foo", env="production"}[5m])) by (job)
-    #                 > 0.05
-    #             for: 10m
-    #             labels:
-    #               severity: warning
-    #             annotations:
-    #               summary: High error rate
+    tenant:
+      rules1.txt: |
+        groups:
+          - name: nginx-rate
+            rules:
+            - alert: LokiNginxRate
+              expr: sum(rate({app="nginx"} |= "error" [1m])) by (job)
+                    /
+                  sum(rate({app="nginx"}[1m])) by (job)
+                    > 0.01
+              for: 1m
+              labels:
+                severity: critical
+              annotations:
+                summary: loki nginx rate
+                description: high request latency
     #       - name: credentials_leak
     #         rules:
     #           - alert: http-credentials-leaked
@@ -1546,7 +1578,7 @@ ruler:
 # Configuration for the index-gateway
 indexGateway:
   # -- Specifies whether the index-gateway should be enabled
-  enabled: true
+  enabled: false
   # -- Number of replicas for the index-gateway
   replicas: 1
   # -- hostAliases to add
@@ -1580,7 +1612,13 @@ indexGateway:
   # -- Volumes to add to the index-gateway pods
   extraVolumes: []
   # -- Resource requests and limits for the index-gateway
-  resources: {}
+  resources:
+    requests:
+      memory: 200Mi
+      cpu: 50m
+    limits:
+      memory: 200Mi
+      cpu: 50m
   # -- Containers to add to the index-gateway pods
   extraContainers: []
   # -- Init containers to add to the index-gateway pods
@@ -1611,17 +1649,17 @@ indexGateway:
   tolerations: []
   persistence:
     # -- Enable creating PVCs which is required when using boltdb-shipper
-    enabled: false
+    enabled: true
     # -- Use emptyDir with ramdisk for storage. **Please note that all data in indexGateway will be lost on pod restart**
     inMemory: false
     # -- Size of persistent or memory disk
-    size: 10Gi
+    size: 5Gi
     # -- Storage class to be used.
     # If defined, storageClassName: <storageClass>.
     # If set to "-", storageClassName: "", which disables dynamic provisioning.
     # If empty or set to null, no storageClassName spec is
     # set, choosing the default provisioner (gp2 on AWS, standard on GKE, AWS, and OpenStack).
-    storageClass: ""
+    storageClass: nfs-csi
     # -- Annotations for index gateway PVCs
     annotations: {}
 
@@ -1988,3 +2026,4 @@ networkPolicy:
     podSelector: {}
     # -- Specifies the namespace the discovery Pods are running in
     namespaceSelector: {}
+

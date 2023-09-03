@@ -1,0 +1,20 @@
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: minio-service
+  namespace: monitoring
+  labels:
+    app: minio-service
+spec:
+  ports:
+    - name: http-9000
+      protocol: TCP
+      port: 9000
+    - name: http-9001
+      protocol: TCP
+      port: 9001
+      nodePort: 30091
+  selector:
+    app: minio
+  type: NodePort
