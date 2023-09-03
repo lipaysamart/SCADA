@@ -22,7 +22,7 @@ data:
       # 如果Loki以微服务模式运行，则这是Distributor的HTTP URL。需要包含推送API的路径。
       - url: http://loki-loki-distributed-gateway/loki/api/v1/push
         # 默认用于将日志推送到Loki的租户ID。
-        # tenant_id: local
+        # tenant_id: fake
         # 在发送批处理之前等待的最长时间，即使该批处理未满。
         batchwait: 3s
         # 在将批处理发送到Loki之前累积的日志的最大批处理大小（以字节为单位）
