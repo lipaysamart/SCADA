@@ -547,7 +547,7 @@ config:
       # 如果Loki以微服务模式运行，则这是Distributor的HTTP URL。需要包含推送API的路径。
       - url: http://loki-loki-distributed-gateway/loki/api/v1/push
         # 默认用于将日志推送到Loki的租户ID。
-        # tenant_id: tenant
+        tenant_id: tenant-1
         # 在发送批处理之前等待的最长时间，即使该批处理未满。
         batchwait: 3s
         # 在将批处理发送到Loki之前累积的日志的最大批处理大小（以字节为单位）
@@ -566,7 +566,7 @@ config:
           # 重试之间的最大退避时间
           max_period: 5m
           # 配置在请求失败时重试向Loki发送请求次数。
-          max_retries: 10
+          max_retries: 5
 
     positions:
       filename: /run/promtail/positions.yaml

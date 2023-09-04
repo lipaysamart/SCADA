@@ -22,7 +22,7 @@ data:
       # 如果Loki以微服务模式运行，则这是Distributor的HTTP URL。需要包含推送API的路径。
       - url: http://loki-loki-distributed-gateway/loki/api/v1/push
         # 默认用于将日志推送到Loki的租户ID。
-        # tenant_id: fake
+        tenant_id: tenant-1
         # 在发送批处理之前等待的最长时间，即使该批处理未满。
         batchwait: 3s
         # 在将批处理发送到Loki之前累积的日志的最大批处理大小（以字节为单位）
@@ -56,7 +56,7 @@ data:
     # 这个Promtail实例可以推送到Loki的每秒日志行速率限制。
       readline_rate: 10000
     # 这个Promtail实例可以推送到Loki的并发行数的限制。
-      readline_burst: 20000
+      readline_burst: 10000
     # 限制最大活动流的数量0表示禁用。
       max_streams: 0
     # 允许的最大日志行字节大小,例如, 256kb, 2M。0表示禁用。

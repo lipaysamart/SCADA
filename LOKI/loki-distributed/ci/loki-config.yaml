@@ -11,8 +11,7 @@ metadata:
     app.kubernetes.io/managed-by: Helm
 stringData:
   config.yaml: |
-    auth_enabled: false
-
+    auth_enabled: true
     server:
       http_listen_port: 3100
       # HTTP服务器的空闲超时时间
@@ -52,11 +51,11 @@ stringData:
           store: memberlist
       rate_store:
         # 向ingester流API发出的并发请求的最大数量
-        max_request_parallelism: 2000
+        max_request_parallelism: 1000
         # 分发器从ingester更新当前流速的间隔
-        stream_rate_update_interval: 5s
+        stream_rate_update_interval: 3s
         # 更新速率时，分发器与任何给定的ingester之间的通信超时
-        ingester_request_timeout: 3s
+        ingester_request_timeout: 5s
 
     frontend:
       # 每个前端租户的最大未完成请求数；超过此数会返回 HTTP 429 错误。
@@ -64,14 +63,16 @@ stringData:
       # 压缩 HTTP 响应。
       compress_responses: true
       # 查询持续时间超过指定时间的查询将被记录日志。设置为 0 以禁用该功能。
-      log_queries_longer_than: 5s
+      log_queries_longer_than: 0
       # 用于尾部代理的查询器的 URL
       tail_proxy_url: http://loki-loki-distributed-querier:3100
     frontend_worker:
+      # 查询前端服务的地址，格式为host:port。
       frontend_address: loki-loki-distributed-query-frontend-headless:9095
       # 每个查询前端或查询调度器同时处理的查询数。
-      parallelism: 100
+      parallelism: 10
 
+    # 配置ingester以及ingester将如何向键值存储注册自身
     ingester:
       # 块的目标“压缩”大小（以字节为单位）。这是一个期望的大小，而不是精确的大小。
       chunk_block_size: 262144
@@ -100,15 +101,15 @@ stringData:
       # 强制每个样本都有一个指标名称。
       enforce_metric_name: false
       # 每个流每秒的最大字节速率。
-      per_stream_rate_limit: 512MB
+      per_stream_rate_limit: 100MB
       # 每个流的最大突发字节数
-      per_stream_rate_limit_burst: 1024MB
+      per_stream_rate_limit_burst: 150MB
       # 每个用户的摄取速率限制，以每秒样本大小为单位。单位为MB。
-      ingestion_rate_mb: 1000
+      ingestion_rate_mb: 80
       # 每个用户允许的摄取突发大小（以样本大小为单位）。单位为MB。即使在“global”策略下，突发大小也是指每个分发器的本地速率限制器，并且应该设置为单个推送请求中预期的最大日志大小。
-      ingestion_burst_size_mb: 2000
+      ingestion_burst_size_mb: 120
       # 每个标签集的标签名称的最大数量。
-      max_label_names_per_series: 50
+      max_label_names_per_series: 30
       max_cache_freshness_per_query: 10m
       # 是否拒绝旧样本。  
       reject_old_samples: true
@@ -119,11 +120,11 @@ stringData:
       # 全局设置,每个集群中每个用户的活跃流的最大数量，设置为0以禁用。
       max_global_streams_per_user: 0
       # 单个查询中可以获取的最大块数。
-      max_chunks_per_query: 2000000
+      max_chunks_per_query: 20000
       # 每个查询的最大流匹配器数量。
       max_streams_matchers_per_query: 100000
       # 查询返回的最大日志条目数。
-      max_entries_limit_per_query: 5000000
+      max_entries_limit_per_query: 50000
       # 限制查询返回的唯一标签集的最大数量。当达到限制时，将返回错误。
       max_query_series: 10000
       # 按时间间隔拆分查询并并行执行。值为0禁用按时间拆分。
@@ -133,6 +134,32 @@ stringData:
       join_members:
       - loki-loki-distributed-memberlist
 
+    # 配置查询器。仅在运行所有模块或仅查询器时适用。
+    querier:
+      # 超过此时间范围的查询不会发送到ingester。0表示所有查询都发送到ingester。
+      query_ingesters_within: 3h
+      # 允许的最大并发查询数。
+      max_concurrent: 10
+      # 仅查询存储，不尝试任何ingester。这对于仅存储数据运行的独立查询池非常有用。
+      query_store_only: true
+      # 当为true时，查询器仅查询ingester，而不是存储数据。当对象存储不可用时很有用。
+      query_ingester_only: false
+      # 当为true时，允许查询跨多个租户。
+      multi_tenant_queries_enabled: true
+      # 当为true时，将强制执行通过头部发送的查询器限制。
+      per_request_limits_enabled: false
+
+    # 配置Loki查询调度程序。配置后，它将查询队列与查询前端分开
+    query_scheduler:
+      # 每个查询调度器每个租户的最大未完成请求数。
+      max_outstanding_requests_per_tenant: 100000
+      # 设置为true以创建并将查询调度器放置在一个环中。
+      use_scheduler_ring: true
+      scheduler_ring:
+        kvstore:
+          store: memberlist
+
+    # 配置Loki查询前端中的查询拆分和缓存
     query_range:
       align_queries_with_step: true
       cache_results: true
@@ -196,21 +223,17 @@ stringData:
         s3forcepathstyle: true
         http_config:
           idle_conn_timeout: 90s
-          response_header_timeout: 0s
+          response_header_timeout: 5s
           insecure_skip_verify: true
       boltdb_shipper:
         active_index_directory: /var/loki/index
         cache_ttl: 12h
         shared_store: s3
         cache_location: /var/loki/cache
-        index_gateway_client:
-          server_address: dns:///loki-loki-distributed-index-gateway:9095        
-      filesystem:
-        directory: /var/loki/chunks
       # 每批获取的最大块数。
-      max_chunk_batch_size: 1000
+      max_chunk_batch_size: 10000
       # 并行获取块的最大数量。
-      max_parallel_get_chunk: 5000
+      max_parallel_get_chunk: 50000
       # 活动索引条目的缓存有效期。不应超过-ingester.max-chunk-idle
       index_cache_validity: 30m
       # 缓存配置
@@ -222,17 +245,6 @@ stringData:
         at: 0 
         max_per_second: 20  
         up_to: 3
-
-    #定义索引网关服务器将以哪种模式运行（默认为“simple”）。它支持两种模式：
-    # - 'simple'：一个索引网关服务器实例负责处理、存储和返回所有租户的所有索引的请求。
-    # - 'ring'：一个索引网关服务器实例负责一部分租户，而不是所有租户。    
-    index_gateway:
-      mode: simple
-      ring:
-        kvstore:
-          store: memberlist
-      # 为每个租户分配多少个索引网关实例。
-      # replication_factor: 1
 
     table_manager:
       retention_deletes_enabled: false
