@@ -541,32 +541,29 @@ config:
       log_format: json
       http_listen_port: 3101
       graceful_shutdown_timeout: 30s
+      # gRPC调用的并发流限制（0表示无限制）。
+      grpc_server_max_concurrent_streams: 100
+      # 通过HTTP请求启用重新加载。
+      enable_runtime_reload: true
 
     clients:
       # Loki监听的URL，以http_listen_address和http_listen_port在Loki中表示。
       # 如果Loki以微服务模式运行，则这是Distributor的HTTP URL。需要包含推送API的路径。
-      - url: http://loki-loki-distributed-gateway/loki/api/v1/push
+      - url: http://loki-gateway/loki/api/v1/push
         # 默认用于将日志推送到Loki的租户ID。
-        tenant_id: tenant-1
+        tenant_id: hk-01
         # 在发送批处理之前等待的最长时间，即使该批处理未满。
         batchwait: 3s
         # 在将批处理发送到Loki之前累积的日志的最大批处理大小（以字节为单位）
-        batchsize: 4048576
+        batchsize: 1048576
         # 禁用对Loki以429状态码（TooManyRequests）响应的批处理的重试。
         # 这减少了来自其他租户的批处理的影响，这些批处理可能由于指数回退而被延迟或丢弃。
         drop_rate_limited_batches: true
         # 添加到发送到Loki的所有日志的静态标签。
         external_labels:
-          cluster: local
+          cluster: hk-01
         # 等待服务器响应请求的最长时间。
         timeout: 30s
-        backoff_config:
-          # 重试之间的初始退避时间
-          min_period: 500ms
-          # 重试之间的最大退避时间
-          max_period: 5m
-          # 配置在请求失败时重试向Loki发送请求次数。
-          max_retries: 5
 
     positions:
       filename: /run/promtail/positions.yaml
@@ -581,7 +578,7 @@ config:
     # 这个Promtail实例可以推送到Loki的每秒日志行速率限制。
       readline_rate: 10000
     # 这个Promtail实例可以推送到Loki的并发行数的限制。
-      readline_burst: 20000
+      readline_burst: 10000
     # 限制最大活动流的数量0表示禁用。
       max_streams: 0
     # 允许的最大日志行字节大小,例如, 256kb, 2M。0表示禁用。

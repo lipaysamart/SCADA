@@ -204,7 +204,7 @@ securityContext:
   runAsUser: 10001
 
 containerSecurityContext:
-  readOnlyRootFilesystem: true
+  readOnlyRootFilesystem: false
 
 service:
   type: ClusterIP

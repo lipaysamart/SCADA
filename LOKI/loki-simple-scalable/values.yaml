@@ -34,7 +34,7 @@ loki:
     # -- The Docker registry
     registry: registry.cn-guangzhou.aliyuncs.com
     # -- Docker image repository
-    repository: grafana/loki
+    repository: kubernetes-default/loki
     # -- Overrides the image tag whose default is the chart's appVersion
     tag: 2.8.4
     # -- Docker image pull policy
@@ -161,7 +161,7 @@ loki:
 
 
   # Should authentication be enabled
-  auth_enabled: false
+  auth_enabled: true
 
   # -- Check https://grafana.com/docs/loki/latest/configuration/#common_config for more info on how to provide a common configuration
   commonConfig:
@@ -407,7 +407,7 @@ monitoring:
   # It will create custom resources for GrafanaAgent, LogsInstance, and PodLogs to configure
   # scrape configs to scrape it's own logs with the labels expected by the included dashboards.
   selfMonitoring:
-    enabled: false
+    enabled: true
 
     # Grafana Agent configuration
     grafanaAgent:
@@ -448,7 +448,7 @@ monitoring:
 # Configuration for the write
 write:
   # -- Number of replicas for the write
-  replicas: 3
+  replicas: 2
   image:
     # -- The Docker registry for the write image. Overrides `loki.image.registry`
     registry: null
@@ -477,11 +477,11 @@ write:
   # -- Resource requests and limits for the write
   resources:
     requests:
+      cpu: 100m
       memory: 500Mi
-      cpu: 150m
     limits:
+      cpu: 100m
       memory: 500Mi
-      cpu: 150m
   # -- Grace period to allow the write to shutdown before it is killed. Especially for the ingestor,
   # this must be increased. It must be long enough so writes can be gracefully shutdown flushing/transferring
   # all data and to successfully leave the member ring on shutdown.
@@ -512,7 +512,7 @@ write:
 # Configuration for the read node(s)
 read:
   # -- Number of replicas for the read
-  replicas: 3
+  replicas: 2
   autoscaling:
     # -- Enable autoscaling for the read, this is only used if `queryIndex.enabled: true`
     enabled: false
@@ -552,11 +552,11 @@ read:
   # -- Resource requests and limits for the read
   resources:
     requests:
+      cpu: 100m
       memory: 500Mi
-      cpu: 150m
     limits:
+      cpu: 100m
       memory: 500Mi
-      cpu: 150m
   # -- Grace period to allow the read to shutdown before it is killed
   terminationGracePeriodSeconds: 30
   # -- Affinity for read pods. Passed through `tpl` and, thus, to be configured as string
@@ -592,13 +592,13 @@ gateway:
   verboseLogging: true
   autoscaling:
     # -- Enable autoscaling for the gateway
-    enabled: true
+    enabled: false
     # -- Minimum autoscaling replicas for the gateway
     minReplicas: 1
     # -- Maximum autoscaling replicas for the gateway
     maxReplicas: 3
     # -- Target CPU utilisation percentage for the gateway
-    targetCPUUtilizationPercentage: 80
+    targetCPUUtilizationPercentage: 60
     # -- Target memory utilisation percentage for the gateway
     targetMemoryUtilizationPercentage:
   # -- See `kubectl explain deployment.spec.strategy` for more
@@ -644,7 +644,13 @@ gateway:
         - ALL
     allowPrivilegeEscalation: false
   # -- Resource requests and limits for the gateway
-  resources: {}
+  resources:
+    requests:
+      cpu: 200m
+      memory: 150Mi
+    limits:
+      cpu: 200m
+      memory: 150Mi
   # -- Grace period to allow the gateway to shutdown before it is killed
   terminationGracePeriodSeconds: 30
   # -- Affinity for gateway pods. Passed through `tpl` and, thus, to be configured as string
@@ -734,6 +740,7 @@ gateway:
     # -- Allows appending custom configuration to the http block
     httpSnippet: |-
       client_max_body_size 100M;
+
     # -- Config file contents for Nginx. Passed through the `tpl` function to allow templating
     # -- ref: https://docs.nginx.com/nginx/admin-guide/monitoring/logging/
     # @default -- See [values.yaml](values.yaml)
@@ -744,7 +751,7 @@ gateway:
       worker_rlimit_nofile 8192;
 
       events {
-        worker_connections  54096;  ## Default: 1024
+        worker_connections  4096;  ## Default: 1024
       }
 
       http {

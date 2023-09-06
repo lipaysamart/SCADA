@@ -16,7 +16,7 @@ stringData:
       http_listen_port: 3100
       # HTTP服务器的空闲超时时间
       http_server_idle_timeout: 2m
-      # gRPC调用的并发流的数量限制（0表示无限制）
+      # gRPC调用的并发流的数量限制（0表示无限制, 默认100）
       grpc_server_max_concurrent_streams: 0
       log_format: json
       log_level: info
@@ -31,15 +31,9 @@ stringData:
       # 用于存储boltdb文件的共享存储。
       shared_store: s3
       # 重新运行压缩操作的间隔。
-      compaction_interval: 10m
+      compaction_interval: 5m
       # 应用/执行保留的间隔时间。0表示与压缩间隔相同的间隔运行。如果非零，则应始终是压缩间隔的倍数。
-      apply_retention_interval: 20m
-      # 每个压缩周期运行的最大删除请求数。
-      delete_batch_size: 10000
-      # 用于删除块的工作进程总数。
-      retention_delete_worker_count: 10000
-      # 并行压缩的最大表数。在增加此值时，请确保为压缩器分配了足够的磁盘空间，以能够存储和压缩尽可能多的表。
-      max_compaction_parallelism: 1
+      apply_retention_interval: 0
       compactor_ring:
         kvstore:
           store: memberlist
@@ -75,11 +69,13 @@ stringData:
     # 配置ingester以及ingester将如何向键值存储注册自身
     ingester:
       # 块的目标“压缩”大小（以字节为单位）。这是一个期望的大小，而不是精确的大小。
+      chunk_target_size: 1672864
+      # 块的目标“未压缩”大小（以字节为单位）。当超过此阈值时，头块将在块内部剪切并压缩。
       chunk_block_size: 262144
       # 用于压缩块的算法。（none、gzip、lz4-64k、snappy、lz4-256k、lz4-1M、lz4、flate、zstd）
       chunk_encoding: snappy
       # 如果块未达到最大块大小，则块在没有更新的情况下在内存中停留多长时间后进行刷新。
-      chunk_idle_period: 1h
+      chunk_idle_period: 10m
       # 块在刷新后在内存中保留的持续时间。
       chunk_retain_period: 30s
       # 内存中时间序列块的最大持续时间。如果一个时间序列运行时间超过此值，当前块将被刷新到存储中，并创建一个新的块。
@@ -93,7 +89,7 @@ stringData:
       max_transfer_retries: 0
       wal:
         # 在重放期间WAL可以使用的最大内存大小。达到此限制后，它将在继续之前将数据刷新到存储中。可以应用单位后缀（KB、MB、GB）。
-        replay_memory_ceiling: 1GB
+        replay_memory_ceiling: 256MB
         # 存储和/或从中恢复WAL数据的目录。
         dir: /var/loki/wal
 
@@ -101,15 +97,16 @@ stringData:
       # 强制每个样本都有一个指标名称。
       enforce_metric_name: false
       # 每个流每秒的最大字节速率。
-      per_stream_rate_limit: 100MB
+      per_stream_rate_limit: 4MB
       # 每个流的最大突发字节数
-      per_stream_rate_limit_burst: 150MB
+      per_stream_rate_limit_burst: 15MB
       # 每个用户的摄取速率限制，以每秒样本大小为单位。单位为MB。
-      ingestion_rate_mb: 80
+      ingestion_rate_mb: 6
       # 每个用户允许的摄取突发大小（以样本大小为单位）。单位为MB。即使在“global”策略下，突发大小也是指每个分发器的本地速率限制器，并且应该设置为单个推送请求中预期的最大日志大小。
-      ingestion_burst_size_mb: 120
+      ingestion_burst_size_mb: 8
       # 每个标签集的标签名称的最大数量。
       max_label_names_per_series: 30
+      # 每个租户允许缓存的最新结果，以防止缓存可能仍在变动的最新结果。
       max_cache_freshness_per_query: 10m
       # 是否拒绝旧样本。  
       reject_old_samples: true
@@ -120,13 +117,15 @@ stringData:
       # 全局设置,每个集群中每个用户的活跃流的最大数量，设置为0以禁用。
       max_global_streams_per_user: 0
       # 单个查询中可以获取的最大块数。
-      max_chunks_per_query: 20000
+      max_chunks_per_query: 2000000
       # 每个查询的最大流匹配器数量。
       max_streams_matchers_per_query: 100000
       # 查询返回的最大日志条目数。
       max_entries_limit_per_query: 50000
       # 限制查询返回的唯一标签集的最大数量。当达到限制时，将返回错误。
-      max_query_series: 10000
+      max_query_series: 5000
+      # 索引查询的基数限制。
+      cardinality_limit: 100000
       # 按时间间隔拆分查询并并行执行。值为0禁用按时间拆分。
       split_queries_by_interval: 30m
 
@@ -137,7 +136,7 @@ stringData:
     # 配置查询器。仅在运行所有模块或仅查询器时适用。
     querier:
       # 超过此时间范围的查询不会发送到ingester。0表示所有查询都发送到ingester。
-      query_ingesters_within: 3h
+      query_ingesters_within: 0
       # 允许的最大并发查询数。
       max_concurrent: 10
       # 仅查询存储，不尝试任何ingester。这对于仅存储数据运行的独立查询池非常有用。
@@ -172,14 +171,12 @@ stringData:
 
     ruler:
       alertmanager_url: http://alertmanager-main:9093
-      external_url: http://172.16.10.101:30090
+      external_url: https://alertmanager.example.com
       storage:
         local:
           directory: /etc/loki/rules
         type: local
       rule_path: /tmp/loki/scratch
-      external_labels:
-        cluster: local
       evaluation_interval: 2m
       enable_alertmanager_v2: true
       notification_timeout: 30s
@@ -231,20 +228,16 @@ stringData:
         shared_store: s3
         cache_location: /var/loki/cache
       # 每批获取的最大块数。
-      max_chunk_batch_size: 10000
+      max_chunk_batch_size: 100
       # 并行获取块的最大数量。
-      max_parallel_get_chunk: 50000
+      max_parallel_get_chunk: 500
       # 活动索引条目的缓存有效期。不应超过-ingester.max-chunk-idle
-      index_cache_validity: 30m
+      index_cache_validity: 10m
       # 缓存配置
       index_queries_cache_config:
         redis:
           endpoint: redis:6379
           expiration: 1h
-      hedging:
-        at: 0 
-        max_per_second: 20  
-        up_to: 3
 
     table_manager:
       retention_deletes_enabled: false
