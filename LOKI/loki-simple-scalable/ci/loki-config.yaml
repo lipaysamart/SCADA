@@ -117,9 +117,19 @@ stringData:
 
     ruler:
       alertmanager_url: http://alertmanager-main.monitoring.svc:9093
+      external_url: http://alertmanager.example.com
       storage:
         s3:
+          endpoint: minio:9000
+          insecure: true
           bucketnames: ruler
+          access_key_id: minio
+          secret_access_key: minio123
+          s3forcepathstyle: true
+          http_config:
+            idle_conn_timeout: 90s
+            response_header_timeout: 0s
+            insecure_skip_verify: true
       evaluation_interval: 2m
       enable_alertmanager_v2: true
       notification_timeout: 30s
@@ -149,7 +159,7 @@ stringData:
 
     storage_config:
       aws:
-        endpoint: minio-service:9000
+        endpoint: minio:9000
         insecure: true
         bucketnames: chunks
         access_key_id: minio
