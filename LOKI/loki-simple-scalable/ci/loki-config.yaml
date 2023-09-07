@@ -4,10 +4,10 @@ metadata:
   name: loki-config
   namespace: monitoring
   labels:
-    helm.sh/chart: loki-distributed-0.71.2
-    app.kubernetes.io/name: loki-distributed
+    helm.sh/chart: loki-simple-scalable-1.8.11
+    app.kubernetes.io/name: loki
     app.kubernetes.io/instance: loki
-    app.kubernetes.io/version: "2.8.4"
+    app.kubernetes.io/version: "2.6.1"
     app.kubernetes.io/managed-by: Helm
 stringData:
   config.yaml: |
@@ -15,16 +15,14 @@ stringData:
 
     common:
       path_prefix: /var/loki
-      replication_factor: 3
-      ring:
-        kvstore:
-          store: memberlist
+      replication_factor: 2
+
     server:
       http_listen_port: 3100
       # HTTP服务器的空闲超时时间
       http_server_idle_timeout: 2m
       # gRPC调用的并发流的数量限制（0表示无限制, 默认100）
-      grpc_server_max_concurrent_streams: 0
+      grpc_server_max_concurrent_streams: 100
       log_format: json
       log_level: info
 
@@ -40,7 +38,7 @@ stringData:
 
     frontend:
       # 每个前端租户的最大未完成请求数；超过此数会返回 HTTP 429 错误。
-      max_outstanding_per_tenant: 1000000
+      max_outstanding_per_tenant: 10000
       # 压缩 HTTP 响应。
       compress_responses: true
       # 查询持续时间超过指定时间的查询将被记录日志。设置为 0 以禁用该功能。
@@ -63,7 +61,7 @@ stringData:
       max_chunk_age: 1h
       wal:
         # 在重放期间WAL可以使用的最大内存大小。达到此限制后，它将在继续之前将数据刷新到存储中。可以应用单位后缀（KB、MB、GB）。
-        replay_memory_ceiling: 256MB
+        replay_memory_ceiling: 512MB
         # 存储和/或从中恢复WAL数据的目录。
         dir: /var/loki/wal
 
@@ -166,6 +164,10 @@ stringData:
         cache_ttl: 12h
         shared_store: s3
         cache_location: /var/loki/cache
+      hedging:
+        at: 250ms
+        max_per_second: 20
+        up_to: 3        
 
       # 每批获取的最大块数。
       max_chunk_batch_size: 100
