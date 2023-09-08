@@ -1,23 +1,15 @@
-apiVersion: v1
-kind: Secret
-metadata:
-  name: loki-config
-  namespace: monitoring
-  labels:
-    helm.sh/chart: loki-simple-scalable-1.8.11
-    app.kubernetes.io/name: loki
-    app.kubernetes.io/instance: loki
-    app.kubernetes.io/version: "2.6.1"
-    app.kubernetes.io/managed-by: Helm
-stringData:
-  config.yaml: |
     auth_enabled: true
 
     common:
       path_prefix: /var/loki
-      replication_factor: 2
+      replication_factor: 1
 
     server:
+      # 读取超时时间
+      http_server_read_timeout: 3m
+      # 写入超时时间
+      http_server_write_timeout: 3m
+      # 服务器监听端口
       http_listen_port: 3100
       # HTTP服务器的空闲超时时间
       http_server_idle_timeout: 2m
@@ -75,7 +67,7 @@ stringData:
       # 每个用户的摄取速率限制，以每秒样本大小为单位。单位为MB。
       ingestion_rate_mb: 6
       # 每个用户允许的摄取突发大小（以样本大小为单位）。单位为MB。即使在“global”策略下，突发大小也是指每个分发器的本地速率限制器，并且应该设置为单个推送请求中预期的最大日志大小。
-      ingestion_burst_size_mb: 8
+      ingestion_burst_size_mb: 10
       # 每个标签集的标签名称的最大数量。
       max_label_names_per_series: 30
       # 每个租户允许缓存的最新结果，以防止缓存可能仍在变动的最新结果。
@@ -99,11 +91,16 @@ stringData:
       # 索引查询的基数限制。
       cardinality_limit: 100000
       # 按时间间隔拆分查询并并行执行。值为0禁用按时间拆分。
-      split_queries_by_interval: 30m
+      split_queries_by_interval: 24h
+      max_query_parallelism: 64
 
     memberlist:
       join_members:
       - loki-memberlist
+
+    querier:
+      max_concurrent: 64
+      multi_tenant_queries_enabled: true
 
     query_range:
       align_queries_with_step: true
@@ -120,7 +117,7 @@ stringData:
       external_url: http://alertmanager.example.com
       storage:
         s3:
-          endpoint: minio:9000
+          endpoint: minio-service:9000
           insecure: true
           bucketnames: ruler
           access_key_id: minio
@@ -159,9 +156,9 @@ stringData:
 
     storage_config:
       aws:
-        endpoint: minio:9000
+        endpoint: minio-service:9000
         insecure: true
-        bucketnames: chunks
+        bucketnames: loki-data
         access_key_id: minio
         secret_access_key: minio123
         s3forcepathstyle: true
