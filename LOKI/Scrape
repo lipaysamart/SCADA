@@ -1,0 +1,28 @@
+- job_name: target_namespace
+  pipeline_stages:
+    - cri: {}
+  kubernetes_sd_configs:
+    - role: pod
+  relabel_configs:          
+    - source_labels:
+      - __meta_kubernetes_pod_controller_name
+      regex: ([0-9a-z-.]+?)(-[0-9a-f]{8,10})?
+      action: replace
+      target_label: __tmp_controller_name
+    - source_labels:
+      - __meta_kubernetes_pod_label_app_kubernetes_io_name
+      - __meta_kubernetes_pod_label_app
+      - __tmp_controller_name
+      - __meta_kubernetes_pod_name
+      regex: ^;*([^;]+)(;.*)?$
+      action: replace
+# 匹配source_label并重新标记为 app
+      target_label: app
+# ingress-nginx替换为你要抓取的Namespace名称
+    - action: replace
+      replacement: /var/log/pods/ingress-nginx*/$1/*.log
+# 以"/"分隔
+      separator: /
+      source_labels:
+        - __meta_kubernetes_pod_container_name
+      target_label: __path__
